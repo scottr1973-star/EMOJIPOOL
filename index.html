@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Emoji Pool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            overscroll-behavior: none;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #1a202c;
+            font-family: 'Poppins', sans-serif;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            box-sizing: border-box;
+        }
+        .header {
+            width: 100%;
+            max-width: 450px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+        .game-container {
+            width: 100%;
+            max-width: 450px;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        #canvas-parent {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 12px;
+            background: linear-gradient(145deg, #5c433a, #4a332a);
+            border: 2px solid #372821;
+            box-sizing: border-box;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            border-radius: 12px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        .instructions-panel {
+            width: 100%;
+            max-width: 450px;
+            flex-shrink: 0;
+            text-align: center;
+            color: #d1d5db;
+            background-color: #374151;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            box-sizing: border-box;
+            margin-top: 0.5rem;
+        }
+        #message-box, #splash-page, #game-over-page {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            z-index: 100;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.5s ease-in-out;
+            opacity: 0;
+            visibility: hidden;
+        }
+        #splash-page.visible, #game-over-page.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        #message-box {
+            top: 40%;
+            padding: 1rem 1.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            pointer-events: none;
+            width: 80%;
+            max-width: 300px;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #message-box.show {
+            opacity: 1;
+        }
+        .animated-emoji {
+            font-size: 4rem;
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .btn {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #2563eb;
+        }
+        .donate-links a {
+            color: #60a5fa;
+            font-weight: 600;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .donate-links a:hover {
+            color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-page">
+        <h1 class="text-4xl font-bold text-yellow-100 mb-4">Emoji Pool</h1>
+        <div class="animated-emoji mb-8">🎱</div>
+        <button id="start-button" class="btn mb-6">Start Game</button>
+        <p class="text-md mb-2">If you enjoyed the game, please consider a donation!</p>
+        <div class="donate-links flex flex-col items-center space-y-2 text-xl">
+            <a href="https://cash.app/$GrooveTime100" target="_blank" rel="noopener noreferrer">CashApp $GrooveTime100</a>
+            <a href="https://paypal.me/GrooveTime100" target="_blank" rel="noopener noreferrer">PayPal.me/GrooveTime100</a>
+            <a href="https://venmo.com/u/GrooveTime100" target="_blank" rel="noopener noreferrer">Venmo @GrooveTime100</a>
+        </div>
+    </div>
+
+    <div id="game-over-page">
+        <h2 id="game-over-title" class="text-4xl font-bold mb-4">Game Over</h2>
+        <p id="game-over-message" class="text-lg mb-6">Thank you for playing!</p>
+        <p class="text-md mb-2">If you enjoyed the game, please consider a donation!</p>
+        <div class="donate-links flex flex-col items-center space-y-2 text-xl">
+            <a href="https://cash.app/$GrooveTime100" target="_blank" rel="noopener noreferrer">CashApp $GrooveTime100</a>
+            <a href="https://paypal.me/GrooveTime100" target="_blank" rel="noopener noreferrer">PayPal.me/GrooveTime100</a>
+            <a href="https://venmo.com/u/GrooveTime100" target="_blank" rel="noopener noreferrer">Venmo @GrooveTime100</a>
+        </div>
+        <button id="play-again-button" class="btn mt-8">Play Again</button>
+    </div>
+
+    <div class="game-wrapper hidden">
+        <div class="header">
+            <h1 class="text-2xl font-bold text-yellow-100">🎱 Emoji Pool</h1>
+            <button id="reset-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+                Reset
+            </button>
+        </div>
+
+        <div class="game-container">
+            <div id="canvas-parent">
+                <canvas id="pool-table"></canvas>
+            </div>
+        </div>
+
+        <div class="instructions-panel">
+            <h3 class="font-bold text-md mb-1 text-white">How to Play</h3>
+            <p class="text-xs"><strong>Tap & Drag</strong> the '😎' ball to aim. Drag side to side for spin!</p>
+        </div>
+    </div>
+
+    <div id="message-box"></div>
+
+    <script>
+        const canvas = document.getElementById('pool-table');
+        const ctx = canvas.getContext('2d');
+        const gameWrapper = document.querySelector('.game-wrapper');
+        const canvasParent = document.getElementById('canvas-parent');
+        const gameContainer = document.querySelector('.game-container');
+        const header = document.querySelector('.header');
+        const instructions = document.querySelector('.instructions-panel');
+        const resetButton = document.getElementById('reset-button');
+        const messageBox = document.getElementById('message-box');
+        const splashPage = document.getElementById('splash-page');
+        const startButton = document.getElementById('start-button');
+        const gameOverPage = document.getElementById('game-over-page');
+        const gameOverTitle = document.getElementById('game-over-title');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const playAgainButton = document.getElementById('play-again-button');
+
+        const ASPECT_RATIO = 2;
+        let BALL_RADIUS, POCKET_RADIUS, HEAD_STRING_Y;
+        let balls = [], pockets = [], scaleFactor = 1;
+        let cueStick = { active: false, startX: 0, startY: 0, endX: 0, endY: 0, power: 0, angle: 0, impactOffset: 0 };
+        let ballsAreMoving = false, cueBallInHand = false, gameState = 'splash';
+
+        const CUE_BALL_EMOJI = '😎', EIGHT_BALL_EMOJI = '🎱';
+        const CUE_BALL_FRICTION = 0.985;
+        const OBJECT_BALL_FRICTION = 0.97;
+        const MIN_VELOCITY = 0.1;
+
+        function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
+        function showMessage(text, duration = 1500) {
+            messageBox.textContent = text;
+            messageBox.classList.add('show');
+            setTimeout(() => { messageBox.classList.remove('show'); }, duration);
+        }
+
+        function setGameState(state) {
+            gameState = state;
+            gameWrapper.classList.toggle('hidden', gameState !== 'playing');
+            splashPage.classList.toggle('visible', gameState === 'splash');
+            gameOverPage.classList.toggle('visible', gameState === 'gameOver');
+        }
+
+        function resizeAndInitGame() {
+            const totalHeight = document.body.clientHeight;
+            const fixedElementsHeight = header.offsetHeight + instructions.offsetHeight;
+            const verticalMargin = 24;
+            
+            const availableHeight = totalHeight - fixedElementsHeight - verticalMargin;
+            const availableWidth = gameContainer.clientWidth;
+
+            let newCanvasWidth = availableHeight / ASPECT_RATIO;
+            let newCanvasHeight = availableHeight;
+
+            if (newCanvasWidth > availableWidth) {
+                newCanvasWidth = availableWidth;
+                newCanvasHeight = newCanvasWidth * ASPECT_RATIO;
+            }
+
+            const parentPadding = parseFloat(getComputedStyle(canvasParent).padding);
+            canvasParent.style.width = `${newCanvasWidth + parentPadding * 2}px`;
+            canvasParent.style.height = `${newCanvasHeight + parentPadding * 2}px`;
+            
+            canvas.width = newCanvasWidth;
+            canvas.height = newCanvasHeight;
+            
+            scaleFactor = canvas.width / 500;
+            BALL_RADIUS = 20 * scaleFactor;
+            POCKET_RADIUS = 25 * scaleFactor;
+            HEAD_STRING_Y = canvas.height * 0.75;
+
+            setupGameObjects();
+            draw();
+        }
+
+        function setupGameObjects() {
+            pockets = [
+                { x: POCKET_RADIUS, y: POCKET_RADIUS },
+                { x: canvas.width - POCKET_RADIUS, y: POCKET_RADIUS },
+                { x: POCKET_RADIUS, y: canvas.height - POCKET_RADIUS },
+                { x: canvas.width - POCKET_RADIUS, y: canvas.height - POCKET_RADIUS },
+                { x: POCKET_RADIUS * 1.5, y: canvas.height / 2 },
+                { x: canvas.width - (POCKET_RADIUS * 1.5), y: canvas.height / 2 }
+            ];
+            
+            balls = [];
+            const emojis = ['😂', '😍', '🤔', '🤯', '😭', '😡', '😴', '🥳', '🥺', '😇', '😈', '🤠', '🤡', '👽'];
+            
+            balls.push({ x: canvas.width / 2, y: HEAD_STRING_Y, vx: 0, vy: 0, emoji: CUE_BALL_EMOJI, isPocketed: false, id: 'cue', spinVx: 0, spinVy: 0, mass: 1 });
+            
+            const startY = canvas.height * 0.25;
+            const pyramid = [
+                [0], [1, 2], [3, 4, 5], [6, 7, 8, 9], [10, 11, 12, 13, 14]
+            ];
+            const eightBallPos = { row: 2, col: 1 };
+            
+            let ballIndex = 0;
+            for (let i = 0; i < pyramid.length; i++) {
+                const row = pyramid[i];
+                const rowOffset = (i * BALL_RADIUS * 2 * 0.866);
+                const startX = canvas.width / 2 - (row.length - 1) * BALL_RADIUS;
+                
+                for (let j = 0; j < row.length; j++) {
+                    const isEightBall = (i === eightBallPos.row && j === eightBallPos.col);
+                    const currentEmoji = isEightBall ? EIGHT_BALL_EMOJI : emojis[ballIndex++ % emojis.length];
+                    const ballColor = isEightBall ? '#1f1f1f' : ((row[j] % 2 === 1) ? '#FF0000' : '#FFFF00');
+                    
+                    balls.push({
+                        x: startX + j * BALL_RADIUS * 2,
+                        y: startY + rowOffset,
+                        vx: 0, vy: 0, emoji: currentEmoji, isPocketed: false, id: row[j], color: ballColor,
+                        mass: 1, spinVx: 0, spinVy: 0
+                    });
+                }
+            }
+            cueBallInHand = false;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const greenGradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.width/4, canvas.width/2, canvas.height/2, canvas.width/1.2);
+            greenGradient.addColorStop(0, '#108040');
+            greenGradient.addColorStop(1, '#0a6d3c');
+            ctx.fillStyle = greenGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            pockets.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = 'black';
+                ctx.fill();
+            });
+
+            ctx.beginPath();
+            ctx.moveTo(0, HEAD_STRING_Y);
+            ctx.lineTo(canvas.width, HEAD_STRING_Y);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash([5 * scaleFactor, 5 * scaleFactor]);
+            ctx.lineWidth = 2 * scaleFactor;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            balls.forEach(ball => {
+                if (ball.isPocketed) return;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+                
+                if (ball.id !== 'cue') {
+                    ctx.fillStyle = ball.color;
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'white';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                ctx.font = `${BALL_RADIUS * 1.3}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ball.emoji, ball.x, ball.y);
+            });
+
+            if (cueStick.active && !ballsAreMoving) {
+                const cueBall = balls[0];
+                const dx = cueStick.endX - cueStick.startX;
+                const dy = cueStick.endY - cueStick.startY;
+                cueStick.power = Math.min(distance(0,0,dx,dy) / (150 * scaleFactor), 1);
+                cueStick.angle = Math.atan2(dy, dx);
+                
+                const powerLineLength = cueStick.power * 200 * scaleFactor;
+                const impactPointX = cueBall.x + Math.cos(cueStick.angle) * cueStick.impactOffset;
+                const impactPointY = cueBall.y + Math.sin(cueStick.angle) * cueStick.impactOffset;
+
+                ctx.beginPath();
+                ctx.moveTo(impactPointX, impactPointY);
+                ctx.lineTo(impactPointX - Math.cos(cueStick.angle) * powerLineLength, impactPointY - Math.sin(cueStick.angle) * powerLineLength);
+                ctx.strokeStyle = `rgba(255, ${255 * (1 - cueStick.power)}, 0, 0.7)`;
+                ctx.lineWidth = 2 * scaleFactor;
+                ctx.setLineDash([5 * scaleFactor, 5 * scaleFactor]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.beginPath();
+                ctx.arc(impactPointX, impactPointY, BALL_RADIUS * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+            }
+        }
+        
+        function update() {
+            ballsAreMoving = balls.some(b => Math.abs(b.vx) > MIN_VELOCITY || Math.abs(b.vy) > MIN_VELOCITY);
+            if(!ballsAreMoving && cueStick.active === false && gameState === 'playing') return;
+
+            // Update positions first
+            balls.forEach(ball => {
+                if (ball.isPocketed) return;
+                const friction = (ball.id === 'cue') ? CUE_BALL_FRICTION : OBJECT_BALL_FRICTION;
+                ball.vx *= friction;
+                ball.vy *= friction;
+                ball.spinVx *= friction;
+                ball.spinVy *= friction;
+
+                ball.x += ball.vx + ball.spinVx;
+                ball.y += ball.vy + ball.spinVy;
+            });
+            
+            // Resolve all collisions and bounce off walls
+            balls.forEach((ball, i) => {
+                if (ball.isPocketed) return;
+
+                // Wall collisions
+                if (ball.x + BALL_RADIUS > canvas.width) {
+                    ball.x = canvas.width - BALL_RADIUS;
+                    ball.vx *= -1;
+                } else if (ball.x - BALL_RADIUS < 0) {
+                    ball.x = BALL_RADIUS;
+                    ball.vx *= -1;
+                }
+                if (ball.y + BALL_RADIUS > canvas.height) {
+                    ball.y = canvas.height - BALL_RADIUS;
+                    ball.vy *= -1;
+                } else if (ball.y - BALL_RADIUS < 0) {
+                    ball.y = BALL_RADIUS;
+                    ball.vy *= -1;
+                }
+
+                // Pocketing
+                pockets.forEach(p => {
+                    if (distance(ball.x, ball.y, p.x, p.y) < POCKET_RADIUS * 0.9) {
+                        ball.isPocketed = true;
+                        ball.vx = 0; ball.vy = 0;
+                        if (ball.id === 'cue') {
+                            showMessage('Scratch!');
+                            cueBallInHand = true;
+                            setTimeout(() => {
+                                ball.isPocketed = false;
+                                ball.x = canvas.width / 2;
+                                ball.y = HEAD_STRING_Y;
+                            }, 500);
+                        } else if(ball.emoji === EIGHT_BALL_EMOJI) {
+                            const remaining = balls.filter(b => b.id !== 'cue' && b.emoji !== EIGHT_BALL_EMOJI && !b.isPocketed).length;
+                            gameOverTitle.textContent = remaining === 0 ? 'You Win! 🎉' : 'Game Over';
+                            gameOverMessage.textContent = remaining === 0 ? 'Congratulations!' : 'Better luck next time!';
+                            setTimeout(() => {
+                                setGameState('gameOver');
+                            }, 1000);
+                        }
+                    }
+                });
+
+                // Ball-to-ball collisions
+                for (let j = i + 1; j < balls.length; j++) {
+                    const other = balls[j];
+                    if (other.isPocketed) continue;
+                    
+                    const dx = other.x - ball.x;
+                    const dy = other.y - ball.y;
+                    const dist = distance(ball.x, ball.y, other.x, other.y);
+                    
+                    if (dist < BALL_RADIUS * 2 && dist !== 0) {
+                        const overlap = (BALL_RADIUS * 2) - dist;
+                        const normalX = dx / dist;
+                        const normalY = dy / dist;
+                        
+                        // Positional correction
+                        ball.x -= normalX * (overlap / 2);
+                        ball.y -= normalY * (overlap / 2);
+                        other.x += normalX * (overlap / 2);
+                        other.y += normalY * (overlap / 2);
+
+                        // Velocity exchange
+                        const relativeVelocityX = other.vx - ball.vx;
+                        const relativeVelocityY = other.vy - ball.vy; // THIS WAS THE BUG!
+                        const dotProduct = relativeVelocityX * normalX + relativeVelocityY * normalY;
+                        if (dotProduct > 0) continue;
+
+                        const restitution = 0.7;
+                        const impulse = (2 * dotProduct) / (ball.mass + other.mass) * (1 + restitution);
+
+                        ball.vx += impulse * other.mass * normalX;
+                        ball.vy += impulse * other.mass * normalY;
+                        other.vx -= impulse * ball.mass * normalX;
+                        other.vy -= impulse * ball.mass * normalY;
+                    }
+                }
+            });
+
+            // Stop very slow balls
+            balls.forEach(ball => {
+                if (Math.abs(ball.vx) < MIN_VELOCITY) ball.vx = 0;
+                if (Math.abs(ball.vy) < MIN_VELOCITY) ball.vy = 0;
+                if (Math.abs(ball.spinVx) < MIN_VELOCITY) ball.spinVx = 0;
+                if (Math.abs(ball.spinVy) < MIN_VELOCITY) ball.spinVy = 0;
+            });
+        }
+
+        function gameLoop() {
+            if (gameState === 'playing') {
+                update();
+                draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function getEventPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            return { 
+                x: (touch.clientX - rect.left),
+                y: (touch.clientY - rect.top)
+            };
+        }
+
+        function onDragStart(e) {
+            if (ballsAreMoving || gameState !== 'playing') return;
+            const pos = getEventPos(e);
+            
+            if (cueBallInHand && e.target === canvas) {
+                balls[0].x = Math.max(BALL_RADIUS, Math.min(pos.x, canvas.width - BALL_RADIUS));
+                balls[0].y = Math.max(HEAD_STRING_Y + BALL_RADIUS, Math.min(pos.y, canvas.height - BALL_RADIUS));
+                
+                const overlapping = balls.slice(1).some(b => !b.isPocketed && distance(balls[0].x, balls[0].y, b.x, b.y) < BALL_RADIUS * 2);
+                if (!overlapping) {
+                    cueBallInHand = false;
+                    showMessage("Cue ball placed.");
+                } else {
+                    showMessage("Cannot place cue ball there (overlapping).", 1000);
+                }
+                draw();
+                return;
+            }
+
+            if (distance(pos.x, pos.y, balls[0].x, balls[0].y) < BALL_RADIUS * 2) {
+                cueStick.active = true;
+                cueStick.startX = pos.x; cueStick.startY = pos.y;
+                cueStick.endX = pos.x; cueStick.endY = pos.y;
+                cueStick.impactOffset = 0;
+            }
+        }
+
+        function onDragMove(e) {
+            const pos = getEventPos(e);
+            if (cueStick.active) {
+                const cueBall = balls[0];
+                const dx = pos.x - cueBall.x;
+                const dy = pos.y - cueBall.y;
+                
+                cueStick.endX = pos.x;
+                cueStick.endY = pos.y;
+                
+                const shotAngle = Math.atan2(cueBall.y - pos.y, cueBall.x - pos.x);
+                const dragAngle = Math.atan2(dy, dx);
+                
+                const angleDiff = dragAngle - shotAngle;
+                const dragDistance = distance(cueStick.startX, cueStick.startY, cueStick.endX, cueStick.endY);
+                
+                cueStick.impactOffset = Math.sin(angleDiff) * dragDistance;
+                cueStick.impactOffset = Math.max(-BALL_RADIUS, Math.min(BALL_RADIUS, cueStick.impactOffset));
+            }
+        }
+        
+        function onDragEnd(e) {
+            if (cueStick.active) {
+                cueStick.active = false;
+                const cueBall = balls[0];
+                const basePower = cueStick.power * 15 * scaleFactor;
+                const hitAngle = cueStick.angle;
+
+                cueBall.vx = -Math.cos(hitAngle) * basePower;
+                cueBall.vy = -Math.sin(hitAngle) * basePower;
+
+                const spinStrength = 0.5;
+                const spinAngle = hitAngle - Math.PI / 2;
+                cueBall.spinVx = Math.cos(spinAngle) * cueStick.impactOffset * spinStrength;
+                cueBall.spinVy = Math.sin(spinAngle) * cueStick.impactOffset * spinStrength;
+            }
+        }
+
+        startButton.addEventListener('click', () => {
+            setGameState('playing');
+            resizeAndInitGame();
+        });
+        
+        playAgainButton.addEventListener('click', () => {
+            setGameState('playing');
+            resizeAndInitGame();
+        });
+
+        window.addEventListener('resize', resizeAndInitGame);
+        resetButton.addEventListener('click', () => {
+            showMessage('New Game!', 1000);
+            resizeAndInitGame();
+        });
+        canvas.addEventListener('mousedown', onDragStart);
+        window.addEventListener('mousemove', onDragMove);
+        window.addEventListener('mouseup', onDragEnd);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onDragStart(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onDragMove(e); }, { passive: false });
+        window.addEventListener('touchend', onDragEnd);
+        
+        resizeAndInitGame();
+        gameLoop();
+        setGameState('splash');
+    </script>
+
+</body>
+</html>
