@@ -212,14 +212,15 @@
         let balls = [], pockets = [], scaleFactor = 1;
         let cueStick = { active: false, startX: 0, startY: 0, endX: 0, endY: 0, power: 0, angle: 0, impactOffset: 0 };
         let ballsAreMoving = false, cueBallInHand = false, gameState = 'splash';
-
+        
         const CUE_BALL_EMOJI = '😎', EIGHT_BALL_EMOJI = '🎱';
         const CUE_BALL_FRICTION = 0.992;
         const OBJECT_BALL_FRICTION = 0.977;
         const MIN_VELOCITY = 0.1;
 
+        // Moved audio context initialization to a global scope
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
+        
         function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
         function showMessage(text, duration = 1500) {
             messageBox.textContent = text;
@@ -227,24 +228,16 @@
             setTimeout(() => { messageBox.classList.remove('show'); }, duration);
         }
 
-        // UPDATED: Generates a layered sound effect (beep/clack + explosion/thud)
         function playBallHitSound() {
-            // Ensure the context is running (required by some browsers for user interaction)
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
-
             const now = audioContext.currentTime;
             
             // --- 1. The high-pitched 'clack' (Beep component) ---
             const osc = audioContext.createOscillator();
             const oscGain = audioContext.createGain();
             
-            // Start high and use a triangle wave for a quick, percussive tone
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(800, now);
 
-            // Fast volume decay for the 'clack' effect
             oscGain.gain.setValueAtTime(0.5, now);
             oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); 
 
@@ -263,7 +256,6 @@
             
             const noiseGain = audioContext.createGain();
             
-            // Lower volume for the thud, slightly longer decay for depth
             noiseGain.gain.setValueAtTime(0.3, now); 
             noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); 
 
@@ -317,7 +309,6 @@
             
             scaleFactor = canvas.width / 500;
             BALL_RADIUS = 20 * scaleFactor;
-            // Increased pocket size to overlap the brown rail more
             POCKET_RADIUS = 30 * scaleFactor; 
             HEAD_STRING_Y = canvas.height * 0.75;
 
@@ -326,7 +317,6 @@
         }
 
         function setupGameObjects() {
-            // Pockets positioned to overlap the edges slightly more
             const pocketOffset = 5 * scaleFactor; 
             pockets = [
                 { x: POCKET_RADIUS - pocketOffset, y: POCKET_RADIUS - pocketOffset },
@@ -460,7 +450,6 @@
             ballsAreMoving = balls.some(b => Math.abs(b.vx) > MIN_VELOCITY || Math.abs(b.vy) > MIN_VELOCITY);
             if(!ballsAreMoving && cueStick.active === false && gameState === 'playing') return;
 
-            // Update positions first
             balls.forEach(ball => {
                 if (ball.isPocketed) return;
                 const friction = (ball.id === 'cue') ? CUE_BALL_FRICTION : OBJECT_BALL_FRICTION;
@@ -473,11 +462,9 @@
                 ball.y += ball.vy + ball.spinVy;
             });
             
-            // Resolve all collisions and bounce off walls
             balls.forEach((ball, i) => {
                 if (ball.isPocketed) return;
 
-                // Wall collisions
                 if (ball.x + BALL_RADIUS > canvas.width) {
                     ball.x = canvas.width - BALL_RADIUS;
                     ball.vx *= -1;
@@ -493,7 +480,6 @@
                     ball.vy *= -1;
                 }
 
-                // Pocketing
                 pockets.forEach(p => {
                     if (distance(ball.x, ball.y, p.x, p.y) < POCKET_RADIUS * 0.9) {
                         ball.isPocketed = true;
@@ -517,7 +503,6 @@
                     }
                 });
 
-                // Ball-to-ball collisions
                 for (let j = i + 1; j < balls.length; j++) {
                     const other = balls[j];
                     if (other.isPocketed) continue;
@@ -532,13 +517,11 @@
                         const normalX = dx / dist;
                         const normalY = dy / dist;
                         
-                        // Positional correction
                         ball.x -= normalX * (overlap / 2);
                         ball.y -= normalY * (overlap / 2);
                         other.x += normalX * (overlap / 2);
                         other.y += normalY * (overlap / 2);
 
-                        // Velocity exchange
                         const relativeVelocityX = other.vx - ball.vx;
                         const relativeVelocityY = other.vy - ball.vy;
                         const dotProduct = relativeVelocityX * normalX + relativeVelocityY * normalY;
@@ -555,7 +538,6 @@
                 }
             });
 
-            // Stop very slow balls
             balls.forEach(ball => {
                 if (Math.abs(ball.vx) < MIN_VELOCITY) ball.vx = 0;
                 if (Math.abs(ball.vy) < MIN_VELOCITY) ball.vy = 0;
@@ -647,6 +629,12 @@
         }
 
         startButton.addEventListener('click', () => {
+            // Fix: resume the audio context on the first user interaction to prevent the initial "screech"
+            audioContext.resume().then(() => {
+              console.log('AudioContext resumed successfully');
+            }).catch(e => {
+              console.error('Failed to resume AudioContext:', e);
+            });
             setGameState('playing');
             resizeAndInitGame();
         });
@@ -674,4 +662,3 @@
     </script>
 
 </body>
-</html>
