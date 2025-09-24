@@ -219,7 +219,9 @@
         const MIN_VELOCITY = 0.1;
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+        let lastSoundTime = 0;
+        const SOUND_COOLDOWN = 0.05; // 50 milliseconds
+
         function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
         function showMessage(text, duration = 1500) {
             messageBox.textContent = text;
@@ -229,15 +231,19 @@
 
         function playBallHitSound() {
             const now = audioContext.currentTime;
-            
+            if (now - lastSoundTime < SOUND_COOLDOWN) {
+                return; // Suppress sound if too recent
+            }
+            lastSoundTime = now;
+
             const osc = audioContext.createOscillator();
             const oscGain = audioContext.createGain();
             
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(800, now);
 
-            oscGain.gain.setValueAtTime(0.5, now);
-            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); 
+            oscGain.gain.setValueAtTime(0.3, now); // Reduced initial gain
+            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08); // Quicker ramp-down
 
             osc.connect(oscGain);
 
@@ -253,8 +259,8 @@
             
             const noiseGain = audioContext.createGain();
             
-            noiseGain.gain.setValueAtTime(0.3, now); 
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); 
+            noiseGain.gain.setValueAtTime(0.15, now); // Reduced initial gain
+            noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15); // Quicker ramp-down
 
             noise.connect(noiseGain);
 
@@ -624,13 +630,6 @@
         }
 
         startButton.addEventListener('click', () => {
-            // New fix: play a silent sound to warm up the audio context
-            const buffer = audioContext.createBuffer(1, 1, 22050);
-            const source = audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioContext.destination);
-            source.start(0);
-
             setGameState('playing');
             resizeAndInitGame();
         });
