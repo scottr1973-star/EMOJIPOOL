@@ -218,11 +218,71 @@
         const OBJECT_BALL_FRICTION = 0.977;
         const MIN_VELOCITY = 0.1;
 
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
         function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
         function showMessage(text, duration = 1500) {
             messageBox.textContent = text;
             messageBox.classList.add('show');
             setTimeout(() => { messageBox.classList.remove('show'); }, duration);
+        }
+
+        // UPDATED: Generates a layered sound effect (beep/clack + explosion/thud)
+        function playBallHitSound() {
+            // Ensure the context is running (required by some browsers for user interaction)
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+
+            const now = audioContext.currentTime;
+            
+            // --- 1. The high-pitched 'clack' (Beep component) ---
+            const osc = audioContext.createOscillator();
+            const oscGain = audioContext.createGain();
+            
+            // Start high and use a triangle wave for a quick, percussive tone
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, now);
+
+            // Fast volume decay for the 'clack' effect
+            oscGain.gain.setValueAtTime(0.5, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08); 
+
+            osc.connect(oscGain);
+
+            // --- 2. The low-end 'thud' (Explosion/Depth component using Noise) ---
+            const bufferSize = audioContext.sampleRate * 0.15; // 0.15 seconds of noise
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1; // Fill with white noise
+            }
+
+            const noise = audioContext.createBufferSource();
+            noise.buffer = noiseBuffer;
+            
+            const noiseGain = audioContext.createGain();
+            
+            // Lower volume for the thud, slightly longer decay for depth
+            noiseGain.gain.setValueAtTime(0.3, now); 
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); 
+
+            noise.connect(noiseGain);
+
+            // --- 3. Connect and Play ---
+            
+            const masterGain = audioContext.createGain();
+            masterGain.gain.setValueAtTime(0.8, now); // Overall volume control
+
+            oscGain.connect(masterGain);
+            noiseGain.connect(masterGain);
+            masterGain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.08);
+
+            noise.start(now);
+            noise.stop(now + 0.15);
         }
 
         function setGameState(state) {
@@ -257,7 +317,8 @@
             
             scaleFactor = canvas.width / 500;
             BALL_RADIUS = 20 * scaleFactor;
-            POCKET_RADIUS = 25 * scaleFactor;
+            // Increased pocket size to overlap the brown rail more
+            POCKET_RADIUS = 30 * scaleFactor; 
             HEAD_STRING_Y = canvas.height * 0.75;
 
             setupGameObjects();
@@ -265,13 +326,15 @@
         }
 
         function setupGameObjects() {
+            // Pockets positioned to overlap the edges slightly more
+            const pocketOffset = 5 * scaleFactor; 
             pockets = [
-                { x: POCKET_RADIUS, y: POCKET_RADIUS },
-                { x: canvas.width - POCKET_RADIUS, y: POCKET_RADIUS },
-                { x: POCKET_RADIUS, y: canvas.height - POCKET_RADIUS },
-                { x: canvas.width - POCKET_RADIUS, y: canvas.height - POCKET_RADIUS },
-                { x: POCKET_RADIUS * 1.5, y: canvas.height / 2 },
-                { x: canvas.width - (POCKET_RADIUS * 1.5), y: canvas.height / 2 }
+                { x: POCKET_RADIUS - pocketOffset, y: POCKET_RADIUS - pocketOffset },
+                { x: canvas.width - POCKET_RADIUS + pocketOffset, y: POCKET_RADIUS - pocketOffset },
+                { x: POCKET_RADIUS - pocketOffset, y: canvas.height - POCKET_RADIUS + pocketOffset },
+                { x: canvas.width - POCKET_RADIUS + pocketOffset, y: canvas.height - POCKET_RADIUS + pocketOffset },
+                { x: POCKET_RADIUS - pocketOffset, y: canvas.height / 2 },
+                { x: canvas.width - POCKET_RADIUS + pocketOffset, y: canvas.height / 2 }
             ];
             
             balls = [];
@@ -294,7 +357,7 @@
                 for (let j = 0; j < row.length; j++) {
                     const isEightBall = (i === eightBallPos.row && j === eightBallPos.col);
                     const currentEmoji = isEightBall ? EIGHT_BALL_EMOJI : emojis[ballIndex++ % emojis.length];
-                    const ballColor = isEightBall ? '#1f1f1f' : ((row[j] % 2 === 1) ? '#FF0000' : '#FFFF00');
+                    const ballColor = isEightBall ? '#1f1f1f' : ((row[j] % 2 === 1) ? '#FF0000' : '#0050FF');
                     
                     balls.push({
                         x: startX + j * BALL_RADIUS * 2,
@@ -307,13 +370,23 @@
             cueBallInHand = false;
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const greenGradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.width/4, canvas.width/2, canvas.height/2, canvas.width/1.2);
+        function drawPoolTable() {
+            const greenGradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.width / 4, canvas.width / 2, canvas.height / 2, canvas.width / 1.2);
             greenGradient.addColorStop(0, '#108040');
             greenGradient.addColorStop(1, '#0a6d3c');
             ctx.fillStyle = greenGradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const vignette = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.width * 0.2, canvas.width / 2, canvas.height / 2, canvas.width * 0.6);
+            vignette.addColorStop(0, 'rgba(0,0,0,0)');
+            vignette.addColorStop(1, 'rgba(0,0,0,0.5)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPoolTable();
 
             pockets.forEach(p => {
                 ctx.beginPath();
@@ -454,6 +527,7 @@
                     const dist = distance(ball.x, ball.y, other.x, other.y);
                     
                     if (dist < BALL_RADIUS * 2 && dist !== 0) {
+                        playBallHitSound();
                         const overlap = (BALL_RADIUS * 2) - dist;
                         const normalX = dx / dist;
                         const normalY = dy / dist;
@@ -466,7 +540,7 @@
 
                         // Velocity exchange
                         const relativeVelocityX = other.vx - ball.vx;
-                        const relativeVelocityY = other.vy - ball.vy; // THIS WAS THE BUG!
+                        const relativeVelocityY = other.vy - ball.vy;
                         const dotProduct = relativeVelocityX * normalX + relativeVelocityY * normalY;
                         if (dotProduct > 0) continue;
 
