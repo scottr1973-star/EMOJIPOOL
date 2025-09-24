@@ -212,6 +212,7 @@
         let balls = [], pockets = [], scaleFactor = 1;
         let cueStick = { active: false, startX: 0, startY: 0, endX: 0, endY: 0, power: 0, angle: 0, impactOffset: 0 };
         let ballsAreMoving = false, cueBallInHand = false, gameState = 'splash';
+        let isFirstBreak = true;
         
         const CUE_BALL_EMOJI = '😎', EIGHT_BALL_EMOJI = '🎱';
         const CUE_BALL_FRICTION = 0.992;
@@ -238,42 +239,42 @@
 
             const osc = audioContext.createOscillator();
             const oscGain = audioContext.createGain();
-            
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(800, now);
+            const noise = audioContext.createBufferSource();
+            const noiseGain = audioContext.createGain();
 
-            oscGain.gain.setValueAtTime(0.3, now);
-            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+            if (isFirstBreak) {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, now);
+                oscGain.gain.setValueAtTime(0.5, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+                isFirstBreak = false;
+            } else {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, now);
+                oscGain.gain.setValueAtTime(0.3, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+            }
 
             osc.connect(oscGain);
-
             const bufferSize = audioContext.sampleRate * 0.15;
             const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
             const output = noiseBuffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
                 output[i] = Math.random() * 2 - 1;
             }
-
-            const noise = audioContext.createBufferSource();
             noise.buffer = noiseBuffer;
-            
-            const noiseGain = audioContext.createGain();
-            
             noiseGain.gain.setValueAtTime(0.15, now);
             noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
-
             noise.connect(noiseGain);
 
             const masterGain = audioContext.createGain();
             masterGain.gain.setValueAtTime(0.8, now);
-
             oscGain.connect(masterGain);
             noiseGain.connect(masterGain);
             masterGain.connect(audioContext.destination);
 
             osc.start(now);
-            osc.stop(now + 0.08);
-
+            osc.stop(now + 0.5);
             noise.start(now);
             noise.stop(now + 0.15);
         }
@@ -318,6 +319,7 @@
         }
 
         function setupGameObjects() {
+            isFirstBreak = true;
             const pocketOffset = 5 * scaleFactor; 
             pockets = [
                 { x: POCKET_RADIUS - pocketOffset, y: POCKET_RADIUS - pocketOffset },
@@ -565,7 +567,6 @@
         }
 
         function onDragStart(e) {
-            // New fix: Resume the audio context on the first user interaction
             if (audioContext.state === 'suspended') {
                 audioContext.resume().catch(e => console.error("AudioContext resume failed:", e));
             }
