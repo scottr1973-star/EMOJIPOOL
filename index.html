@@ -220,7 +220,7 @@
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         let lastSoundTime = 0;
-        const SOUND_COOLDOWN = 0.05; // 50 milliseconds
+        const SOUND_COOLDOWN = 0.05;
 
         function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
         function showMessage(text, duration = 1500) {
@@ -232,7 +232,7 @@
         function playBallHitSound() {
             const now = audioContext.currentTime;
             if (now - lastSoundTime < SOUND_COOLDOWN) {
-                return; // Suppress sound if too recent
+                return;
             }
             lastSoundTime = now;
 
@@ -242,8 +242,8 @@
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(800, now);
 
-            oscGain.gain.setValueAtTime(0.3, now); // Reduced initial gain
-            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08); // Quicker ramp-down
+            oscGain.gain.setValueAtTime(0.3, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
 
             osc.connect(oscGain);
 
@@ -259,8 +259,8 @@
             
             const noiseGain = audioContext.createGain();
             
-            noiseGain.gain.setValueAtTime(0.15, now); // Reduced initial gain
-            noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15); // Quicker ramp-down
+            noiseGain.gain.setValueAtTime(0.15, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
 
             noise.connect(noiseGain);
 
@@ -565,6 +565,11 @@
         }
 
         function onDragStart(e) {
+            // New fix: Resume the audio context on the first user interaction
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.error("AudioContext resume failed:", e));
+            }
+
             if (ballsAreMoving || gameState !== 'playing') return;
             const pos = getEventPos(e);
             
