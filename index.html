@@ -218,7 +218,6 @@
         const OBJECT_BALL_FRICTION = 0.977;
         const MIN_VELOCITY = 0.1;
 
-        // Moved audio context initialization to a global scope
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
         function distance(x1, y1, x2, y2) { return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)); }
@@ -231,7 +230,6 @@
         function playBallHitSound() {
             const now = audioContext.currentTime;
             
-            // --- 1. The high-pitched 'clack' (Beep component) ---
             const osc = audioContext.createOscillator();
             const oscGain = audioContext.createGain();
             
@@ -243,12 +241,11 @@
 
             osc.connect(oscGain);
 
-            // --- 2. The low-end 'thud' (Explosion/Depth component using Noise) ---
-            const bufferSize = audioContext.sampleRate * 0.15; // 0.15 seconds of noise
+            const bufferSize = audioContext.sampleRate * 0.15;
             const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
             const output = noiseBuffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1; // Fill with white noise
+                output[i] = Math.random() * 2 - 1;
             }
 
             const noise = audioContext.createBufferSource();
@@ -261,10 +258,8 @@
 
             noise.connect(noiseGain);
 
-            // --- 3. Connect and Play ---
-            
             const masterGain = audioContext.createGain();
-            masterGain.gain.setValueAtTime(0.8, now); // Overall volume control
+            masterGain.gain.setValueAtTime(0.8, now);
 
             oscGain.connect(masterGain);
             noiseGain.connect(masterGain);
@@ -629,12 +624,13 @@
         }
 
         startButton.addEventListener('click', () => {
-            // Fix: resume the audio context on the first user interaction to prevent the initial "screech"
-            audioContext.resume().then(() => {
-              console.log('AudioContext resumed successfully');
-            }).catch(e => {
-              console.error('Failed to resume AudioContext:', e);
-            });
+            // New fix: play a silent sound to warm up the audio context
+            const buffer = audioContext.createBuffer(1, 1, 22050);
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+
             setGameState('playing');
             resizeAndInitGame();
         });
@@ -662,3 +658,4 @@
     </script>
 
 </body>
+</html>
