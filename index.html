@@ -530,10 +530,13 @@
                     const dist = distance(ball.x, ball.y, other.x, other.y);
                     
                     if (dist < BALL_RADIUS * 2 && dist !== 0) {
-                        if (isFirstBreak) {
-                           playBreakSound();
-                        } else {
-                           playBallHitSound();
+                        // FIX: Only play sound if balls are moving
+                        if (ballsAreMoving) {
+                            if (isFirstBreak) {
+                                playBreakSound();
+                            } else {
+                                playBallHitSound();
+                            }
                         }
                         const overlap = (BALL_RADIUS * 2) - dist;
                         const normalX = dx / dist;
