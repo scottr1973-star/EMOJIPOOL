@@ -218,6 +218,7 @@
         const CUE_BALL_FRICTION = 0.992;
         const OBJECT_BALL_FRICTION = 0.977;
         const MIN_VELOCITY = 0.1;
+        const RACK_GAP_MULTIPLIER = 2.005; // Added a small gap multiplier to prevent static ball collisions
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         let lastSoundTime = 0;
@@ -351,6 +352,7 @@
             balls.push({ x: canvas.width / 2, y: HEAD_STRING_Y, vx: 0, vy: 0, emoji: CUE_BALL_EMOJI, isPocketed: false, id: 'cue', spinVx: 0, spinVy: 0, mass: 1 });
             
             const startY = canvas.height * 0.25;
+            const rackDistance = BALL_RADIUS * RACK_GAP_MULTIPLIER; // Use the multiplier for spacing
             const pyramid = [
                 [0], [1, 2], [3, 4, 5], [6, 7, 8, 9], [10, 11, 12, 13, 14]
             ];
@@ -359,8 +361,10 @@
             let ballIndex = 0;
             for (let i = 0; i < pyramid.length; i++) {
                 const row = pyramid[i];
-                const rowOffset = (i * BALL_RADIUS * 2 * 0.866);
-                const startX = canvas.width / 2 - (row.length - 1) * BALL_RADIUS;
+                // Vertical spacing based on rackDistance
+                const rowOffset = (i * rackDistance * 0.866);
+                // Horizontal centering based on rackDistance
+                const startX = canvas.width / 2 - ((row.length - 1) * rackDistance / 2);
                 
                 for (let j = 0; j < row.length; j++) {
                     const isEightBall = (i === eightBallPos.row && j === eightBallPos.col);
@@ -368,7 +372,8 @@
                     const ballColor = isEightBall ? '#1f1f1f' : ((row[j] % 2 === 1) ? '#FF0000' : '#0050FF');
                     
                     balls.push({
-                        x: startX + j * BALL_RADIUS * 2,
+                        // Horizontal spacing based on rackDistance
+                        x: startX + j * rackDistance,
                         y: startY + rowOffset,
                         vx: 0, vy: 0, emoji: currentEmoji, isPocketed: false, id: row[j], color: ballColor,
                         mass: 1, spinVx: 0, spinVy: 0
