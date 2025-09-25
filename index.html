@@ -27,12 +27,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: space-between;
             padding: 0.5rem;
             box-sizing: border-box;
         }
         .header {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             flex-shrink: 0;
             display: flex;
             justify-content: space-between;
@@ -40,27 +41,15 @@
             margin-bottom: 0.5rem;
             padding: 0 0.5rem;
         }
-
-        /* NEW MAIN LAYOUT: Horizontal for Table and Side Panels */
-        .main-game-area {
-            display: flex;
-            width: 100%;
-            flex-grow: 1;
-            justify-content: center;
-            align-items: stretch;
-            min-height: 0;
-        }
-
         .game-container {
-            /* NEW: Cap the game container size to reduce table height/width */
-            max-width: 400px; 
+            width: 100%;
+            max-width: 450px;
             flex-grow: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0 0.5rem;
+            min-height: 0;
         }
-        
         #canvas-parent {
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
             border-radius: 20px;
@@ -75,48 +64,22 @@
             border-radius: 12px;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
         }
-
-        /* NEW SIDE PANELS STYLES */
-        .side-panel {
+        .instructions-panel, .scoreboard-panel {
+            width: 100%;
+            max-width: 450px;
             flex-shrink: 0;
-            /* INCREASED WIDTH from 80px to 120px */
-            width: 120px; 
-            background-color: #374151;
-            border-radius: 0.75rem;
-            padding: 0.5rem;
-            margin: 0.25rem;
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
+            color: #d1d5db;
+            background-color: #374151;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
             box-sizing: border-box;
-            font-size: 0.75rem;
-            line-height: 1;
+            margin-top: 0.5rem;
         }
-
-        .side-panel h3 {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-            color: #fcd34d;
+        .scoreboard-panel {
+            margin-top: 0;
+            margin-bottom: .05rem;
         }
-        
-        .instructions-text {
-            margin-top: auto;
-            padding-top: 0.5rem;
-            border-top: 1px solid #4b5563;
-        }
-        
-        .instructions-text p {
-            font-size: 0.6rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .player-score-info {
-            margin-bottom: 0.5rem;
-        }
-
         #message-box, #splash-page, #game-over-page {
             position: absolute;
             top: 50%;
@@ -141,7 +104,7 @@
         #message-box {
             top: 40%;
             padding: 1rem 1.5rem;
-            font-size: 1.25rem;
+            font-size: .05rem;
             font-weight: 600;
             pointer-events: none;
             width: 80%;
@@ -180,6 +143,12 @@
         }
         .donate-links a:hover {
             color: #3b82f6;
+        }
+        .ball-count {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
         }
         .current-player {
             font-weight: bold;
@@ -221,37 +190,24 @@
             </button>
         </div>
 
-        <div class="main-game-area">
-            
-            <div id="player1-panel" class="side-panel">
-                <div class="player-score-info">
-                    <h3 id="player1-name">P1 (?)</h3>
-                    <p id="player1-score">Balls Left: 7</p>
-                </div>
-                <div id="current-status-p1"></div>
+        <div class="game-container">
+            <div id="canvas-parent">
+                <canvas id="pool-table"></canvas>
             </div>
+        </div>
+        
+        <div class="scoreboard-panel">
+            <p id="current-status" class="text-lg mb-1">Break Shot!</p>
+            <div class="ball-count">
+                <span id="player1-score">P1 (?): 7</span>
+                <span id="player2-score">P2 (?): 7</span>
+            </div>
+        </div>
 
-            <div class="game-container">
-                <div id="canvas-parent">
-                    <canvas id="pool-table"></canvas>
-                </div>
-            </div>
-            
-            <div id="player2-panel" class="side-panel">
-                <div class="player-score-info">
-                    <h3 id="player2-name">P2 (?)</h3>
-                    <p id="player2-score">Balls Left: 7</p>
-                </div>
-                
-                <div id="current-status-p2"></div>
-
-                <div class="instructions-text">
-                    <p class="font-bold text-white">How to Play</p>
-                    <p>🔴 Solids | 🔵 Stripes</p>
-                    <p>Tap & Drag '😎' ball to aim. Drag side to side for spin!</p>
-                </div>
-            </div>
-            
+        <div class="instructions-panel">
+            <h3 class="font-bold text-md mb-1 text-white">How to Play</h3>
+            <p class="text-xs mb-1">🔴 **Solids** (Red) | 🔵 **Stripes** (Blue) | 😎 Cue Ball | 🎱 8-Ball</p>
+            <p class="text-xs"><strong>Tap & Drag</strong> the '😎' ball to aim. Drag side to side for spin!</p>
         </div>
     </div>
 
@@ -264,6 +220,7 @@
         const canvasParent = document.getElementById('canvas-parent');
         const gameContainer = document.querySelector('.game-container');
         const header = document.querySelector('.header');
+        const instructions = document.querySelector('.instructions-panel');
         const resetButton = document.getElementById('reset-button');
         const messageBox = document.getElementById('message-box');
         const splashPage = document.getElementById('splash-page');
@@ -273,14 +230,10 @@
         const gameOverMessage = document.getElementById('game-over-message');
         const playAgainButton = document.getElementById('play-again-button');
         
-        // Scoreboard elements (Updated to fit new layout)
-        const currentStatusP1 = document.getElementById('current-status-p1');
-        const currentStatusP2 = document.getElementById('current-status-p2');
-        const player1NameEl = document.getElementById('player1-name');
-        const player2NameEl = document.getElementById('player2-name');
+        // Scoreboard elements
+        const currentStatusEl = document.getElementById('current-status');
         const player1ScoreEl = document.getElementById('player1-score');
         const player2ScoreEl = document.getElementById('player2-score');
-
 
         const ASPECT_RATIO = 2;
         let BALL_RADIUS, POCKET_RADIUS, HEAD_STRING_Y;
@@ -397,16 +350,15 @@
 
         function resizeAndInitGame() {
             const totalHeight = document.body.clientHeight;
-            // IMPORTANT CHANGE: Only fixed elements taking up vertical space are the header and vertical margin (24px)
-            const fixedElementsHeight = header.offsetHeight + 24; 
+            const fixedElementsHeight = header.offsetHeight + instructions.offsetHeight + (document.querySelector('.scoreboard-panel')?.offsetHeight || 0);
+            const verticalMargin = 24;
             
-            const availableHeight = totalHeight - fixedElementsHeight;
+            const availableHeight = totalHeight - fixedElementsHeight - verticalMargin;
             const availableWidth = gameContainer.clientWidth;
 
             let newCanvasWidth = availableHeight / ASPECT_RATIO;
             let newCanvasHeight = availableHeight;
-            
-            // Check against the 400px max-width of .game-container
+
             if (newCanvasWidth > availableWidth) {
                 newCanvasWidth = availableWidth;
                 newCanvasHeight = newCanvasWidth * ASPECT_RATIO;
@@ -453,7 +405,7 @@
             const solidEmojis = ['😂', '😍', '🤔', '🤯', '😭', '😡', '😴']; // IDs 1-7
             const stripeEmojis = ['🥳', '🥺', '😇', '😈', '🤠', '🤡', '👽']; // IDs 9-15
             // Standard rack IDs (1-15), 8 is the 8-ball
-            const objectBallIDs = [1, 15, 2, 8, 3, 14, 4, 13, 5, 12, 6, 11, 7, 10, 9]; 
+            const objectBallIDs = [1, 15, 2, 14, 8, 4, 3, 13, 5, 12, 6, 11, 7, 10, 9]; 
 
             balls.push({ x: canvas.width / 2, y: HEAD_STRING_Y, vx: 0, vy: 0, emoji: CUE_BALL_EMOJI, isPocketed: false, id: 0, spinVx: 0, spinVy: 0, mass: 1 });
             
@@ -536,27 +488,19 @@
             const p2BallsLeft = player2.ballType === SOLID_BALLS ? solidsLeft : (player2.ballType === STRIPE_BALLS ? stripesLeft : solidsLeft + stripesLeft);
 
 
-            player1NameEl.innerHTML = currentPlayer === player1 ? `<span class="current-player">▶ P1 (${p1BallType})</span>` : `P1 (${p1BallType})`;
-            player2NameEl.innerHTML = currentPlayer === player2 ? `<span class="current-player">▶ P2 (${p2BallType})</span>` : `P2 (${p2BallType})`;
+            let p1Text = `${player1.name} (${p1BallType}): ${p1BallsLeft}`;
+            let p2Text = `${player2.name} (${p2BallType}): ${p2BallsLeft}`;
 
-            player1ScoreEl.textContent = `Balls Left: ${p1BallsLeft}`;
-            player2ScoreEl.textContent = `Balls Left: ${p2BallsLeft}`;
+            player1ScoreEl.innerHTML = currentPlayer === player1 ? `<span class="current-player">▶ ${p1Text}</span>` : p1Text;
+            player2ScoreEl.innerHTML = currentPlayer === player2 ? `<span class="current-player">▶ ${p2Text}</span>` : p2Text;
 
-            let statusText = '';
             if (isFirstBreak) {
-                statusText = 'Break Shot!';
+                currentStatusEl.textContent = 'Break Shot! Player 1 to shoot.';
             } else if (player1.ballType === UNASSIGNED) {
-                statusText = `Open Table.`;
+                currentStatusEl.textContent = `Open Table. ${currentPlayer.name} to establish balls.`;
             } else {
-                statusText = `${currentPlayer.ballType === SOLID_BALLS ? 'Solids' : 'Stripes'} Turn.`;
+                currentStatusEl.textContent = `${currentPlayer.name} (${currentPlayer.ballType === SOLID_BALLS ? 'Solids' : 'Stripes'}) turn.`;
             }
-            
-            // Update the status on the current player's side
-            const p1Status = currentPlayer === player1 ? statusText : '';
-            const p2Status = currentPlayer === player2 ? statusText : '';
-            
-            currentStatusP1.textContent = p1Status;
-            currentStatusP2.textContent = p2Status;
         }
 
         function draw() {
@@ -609,8 +553,7 @@
                 const cueBall = balls[0];
                 const dx = cueStick.endX - cueStick.startX;
                 const dy = cueStick.endY - cueStick.startY;
-                // Power is scaled back to match the previous version logic, 150 -> 200 is a slight power boost.
-                cueStick.power = Math.min(distance(0,0,dx,dy) / (150 * scaleFactor), 1); 
+                cueStick.power = Math.min(distance(0,0,dx,dy) / (150 * scaleFactor), 1);
                 cueStick.angle = Math.atan2(dy, dx);
                 
                 const powerLineLength = cueStick.power * 200 * scaleFactor;
