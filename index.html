@@ -242,18 +242,10 @@
             const noise = audioContext.createBufferSource();
             const noiseGain = audioContext.createGain();
 
-            if (isFirstBreak) {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(250, now);
-                oscGain.gain.setValueAtTime(0.5, now);
-                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
-                isFirstBreak = false;
-            } else {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(800, now);
-                oscGain.gain.setValueAtTime(0.3, now);
-                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
-            }
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, now);
+            oscGain.gain.setValueAtTime(0.3, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
 
             osc.connect(oscGain);
             const bufferSize = audioContext.sampleRate * 0.15;
@@ -274,9 +266,32 @@
             masterGain.connect(audioContext.destination);
 
             osc.start(now);
-            osc.stop(now + 0.5);
+            osc.stop(now + 0.08);
             noise.start(now);
             noise.stop(now + 0.15);
+        }
+
+        function playBreakSound() {
+            const now = audioContext.currentTime;
+
+            const osc = audioContext.createOscillator();
+            const oscGain = audioContext.createGain();
+            
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(250, now);
+            oscGain.gain.setValueAtTime(0.5, now);
+            oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+            osc.connect(oscGain);
+            
+            const masterGain = audioContext.createGain();
+            masterGain.gain.setValueAtTime(0.8, now);
+            oscGain.connect(masterGain);
+            masterGain.connect(audioContext.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.5);
+            isFirstBreak = false;
         }
 
         function setGameState(state) {
@@ -515,7 +530,11 @@
                     const dist = distance(ball.x, ball.y, other.x, other.y);
                     
                     if (dist < BALL_RADIUS * 2 && dist !== 0) {
-                        playBallHitSound();
+                        if (isFirstBreak) {
+                           playBreakSound();
+                        } else {
+                           playBallHitSound();
+                        }
                         const overlap = (BALL_RADIUS * 2) - dist;
                         const normalX = dx / dist;
                         const normalY = dy / dist;
