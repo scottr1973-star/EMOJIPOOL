@@ -64,7 +64,7 @@
             border-radius: 12px;
             box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
         }
-        .instructions-panel {
+        .instructions-panel, .scoreboard-panel {
             width: 100%;
             max-width: 450px;
             flex-shrink: 0;
@@ -75,6 +75,10 @@
             border-radius: 0.75rem;
             box-sizing: border-box;
             margin-top: 0.5rem;
+        }
+        .scoreboard-panel {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
         }
         #message-box, #splash-page, #game-over-page {
             position: absolute;
@@ -140,6 +144,16 @@
         .donate-links a:hover {
             color: #3b82f6;
         }
+        .ball-count {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .current-player {
+            font-weight: bold;
+            color: #fcd34d;
+        }
     </style>
 </head>
 <body>
@@ -181,9 +195,18 @@
                 <canvas id="pool-table"></canvas>
             </div>
         </div>
+        
+        <div class="scoreboard-panel">
+            <p id="current-status" class="text-lg mb-1">Break Shot!</p>
+            <div class="ball-count">
+                <span id="player1-score">P1 (?): 7</span>
+                <span id="player2-score">P2 (?): 7</span>
+            </div>
+        </div>
 
         <div class="instructions-panel">
             <h3 class="font-bold text-md mb-1 text-white">How to Play</h3>
+            <p class="text-xs mb-1">🔴 **Solids** (Red) | 🔵 **Stripes** (Blue) | 😎 Cue Ball | 🎱 8-Ball</p>
             <p class="text-xs"><strong>Tap & Drag</strong> the '😎' ball to aim. Drag side to side for spin!</p>
         </div>
     </div>
@@ -206,6 +229,11 @@
         const gameOverTitle = document.getElementById('game-over-title');
         const gameOverMessage = document.getElementById('game-over-message');
         const playAgainButton = document.getElementById('play-again-button');
+        
+        // Scoreboard elements
+        const currentStatusEl = document.getElementById('current-status');
+        const player1ScoreEl = document.getElementById('player1-score');
+        const player2ScoreEl = document.getElementById('player2-score');
 
         const ASPECT_RATIO = 2;
         let BALL_RADIUS, POCKET_RADIUS, HEAD_STRING_Y;
@@ -218,7 +246,16 @@
         const CUE_BALL_FRICTION = 0.992;
         const OBJECT_BALL_FRICTION = 0.977;
         const MIN_VELOCITY = 0.1;
-        const RACK_GAP_MULTIPLIER = 2.005; // Added a small gap multiplier to prevent static ball collisions
+        const RACK_GAP_MULTIPLIER = 2.005;
+
+        // NEW GAME STATE VARIABLES
+        const SOLID_BALLS = 'solid', STRIPE_BALLS = 'stripe', UNASSIGNED = 'unassigned';
+        let player1 = { name: 'Player 1', ballType: UNASSIGNED, ballsPocketed: 0 };
+        let player2 = { name: 'Player 2', ballType: UNASSIGNED, ballsPocketed: 0 };
+        let currentPlayer = player1;
+        let turnSuccessful = false;
+        let pocketedBallsInTurn = [];
+        // END NEW GAME STATE VARIABLES
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         let lastSoundTime = 0;
@@ -229,6 +266,15 @@
             messageBox.textContent = text;
             messageBox.classList.add('show');
             setTimeout(() => { messageBox.classList.remove('show'); }, duration);
+        }
+        
+        function getBallType(ball) {
+            if (ball.emoji === EIGHT_BALL_EMOJI) return 'eight';
+            if (ball.id !== 0) {
+                // IDs 1-7 are Solids (Red), IDs 9-15 are Stripes (Blue)
+                return (ball.id >= 1 && ball.id <= 7) ? SOLID_BALLS : STRIPE_BALLS; 
+            }
+            return 'cue';
         }
 
         function playBallHitSound() {
@@ -304,7 +350,7 @@
 
         function resizeAndInitGame() {
             const totalHeight = document.body.clientHeight;
-            const fixedElementsHeight = header.offsetHeight + instructions.offsetHeight;
+            const fixedElementsHeight = header.offsetHeight + instructions.offsetHeight + (document.querySelector('.scoreboard-panel')?.offsetHeight || 0);
             const verticalMargin = 24;
             
             const availableHeight = totalHeight - fixedElementsHeight - verticalMargin;
@@ -336,6 +382,14 @@
 
         function setupGameObjects() {
             isFirstBreak = true;
+            
+            // Reset Game State
+            player1 = { name: 'Player 1', ballType: UNASSIGNED, ballsPocketed: 0 };
+            player2 = { name: 'Player 2', ballType: UNASSIGNED, ballsPocketed: 0 };
+            currentPlayer = player1;
+            turnSuccessful = false;
+            pocketedBallsInTurn = [];
+
             const pocketOffset = 5 * scaleFactor; 
             pockets = [
                 { x: POCKET_RADIUS - pocketOffset, y: POCKET_RADIUS - pocketOffset },
@@ -347,46 +401,58 @@
             ];
             
             balls = [];
-            const emojis = ['😂', '😍', '🤔', '🤯', '😭', '😡', '😴', '🥳', '🥺', '😇', '😈', '🤠', '🤡', '👽'];
-            
-            balls.push({ x: canvas.width / 2, y: HEAD_STRING_Y, vx: 0, vy: 0, emoji: CUE_BALL_EMOJI, isPocketed: false, id: 'cue', spinVx: 0, spinVy: 0, mass: 1 });
+            // Odd IDs (1-7) are solids, Even IDs (9-15) are stripes.
+            const solidEmojis = ['😂', '😍', '🤔', '🤯', '😭', '😡', '😴']; // IDs 1-7
+            const stripeEmojis = ['🥳', '🥺', '😇', '😈', '🤠', '🤡', '👽']; // IDs 9-15
+            // Standard rack IDs (1-15), 8 is the 8-ball
+            const objectBallIDs = [1, 15, 2, 8, 3, 14, 4, 13, 5, 12, 6, 11, 7, 10, 9]; 
+
+            balls.push({ x: canvas.width / 2, y: HEAD_STRING_Y, vx: 0, vy: 0, emoji: CUE_BALL_EMOJI, isPocketed: false, id: 0, spinVx: 0, spinVy: 0, mass: 1 });
             
             // Y-coordinate of the BASE (widest row) of the rack, furthest from the cue ball
             const baseRowY = canvas.height * 0.25; 
-            const rackDistance = BALL_RADIUS * RACK_GAP_MULTIPLIER; // Use the multiplier for spacing
+            const rackDistance = BALL_RADIUS * RACK_GAP_MULTIPLIER;
             const pyramid = [
                 [0], [1, 2], [3, 4, 5], [6, 7, 8, 9], [10, 11, 12, 13, 14]
             ];
-            const maxRows = pyramid.length - 1; // 4
-            const eightBallPos = { row: 2, col: 1 };
+            const maxRows = pyramid.length - 1; 
             
             let ballIndex = 0;
             for (let i = 0; i < pyramid.length; i++) {
                 const row = pyramid[i];
                 
-                // Inverted index: i=4 (base) gives 0. i=0 (point) gives 4.
-                // This ensures the point of the rack is drawn below the base (closer to the cue ball).
+                // Inverted index: i=4 (base) gives 0. i=0 (point) gives 4. Flips the rack.
                 const invertedI = maxRows - i; 
 
-                // Vertical offset now increases as we move towards the point (i=0)
+                // Vertical offset
                 const verticalOffset = (invertedI * rackDistance * 0.866);
 
-                // Row Y starts at baseRowY and increases (moves down the table)
                 const currentY = baseRowY + verticalOffset;
                 
-                // Horizontal centering based on rackDistance
+                // Horizontal centering
                 const startX = canvas.width / 2 - ((row.length - 1) * rackDistance / 2);
                 
                 for (let j = 0; j < row.length; j++) {
-                    const isEightBall = (i === eightBallPos.row && j === eightBallPos.col);
-                    const currentEmoji = isEightBall ? EIGHT_BALL_EMOJI : emojis[ballIndex++ % emojis.length];
-                    const ballColor = isEightBall ? '#1f1f1f' : ((row[j] % 2 === 1) ? '#FF0000' : '#0050FF');
+                    const ballID = objectBallIDs[ballIndex++];
+                    const isEightBall = (ballID === 8);
                     
+                    let currentEmoji, ballColor;
+
+                    if (ballID >= 1 && ballID <= 7) { // Solids (1-7)
+                        currentEmoji = solidEmojis[ballID - 1];
+                        ballColor = '#FF0000'; // Red/Solid
+                    } else if (ballID >= 9 && ballID <= 15) { // Stripes (9-15)
+                        currentEmoji = stripeEmojis[ballID - 9];
+                        ballColor = '#0050FF'; // Blue/Stripe
+                    } else if (isEightBall) { // 8-Ball
+                        currentEmoji = EIGHT_BALL_EMOJI;
+                        ballColor = '#1f1f1f';
+                    }
+
                     balls.push({
-                        // Horizontal spacing based on rackDistance
                         x: startX + j * rackDistance,
                         y: currentY,
-                        vx: 0, vy: 0, emoji: currentEmoji, isPocketed: false, id: row[j], color: ballColor,
+                        vx: 0, vy: 0, emoji: currentEmoji, isPocketed: false, id: ballID, color: ballColor,
                         mass: 1, spinVx: 0, spinVy: 0
                     });
                 }
@@ -407,10 +473,40 @@
             ctx.fillStyle = vignette;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+        
+        function drawScoreboard() {
+            const allBalls = balls.filter(b => b.id >= 1 && b.id <= 15);
+            const solidsLeft = allBalls.filter(b => getBallType(b) === SOLID_BALLS && !b.isPocketed).length;
+            const stripesLeft = allBalls.filter(b => getBallType(b) === STRIPE_BALLS && !b.isPocketed).length;
+            
+            // Determine ball types for display
+            const p1BallType = player1.ballType === UNASSIGNED ? '?' : (player1.ballType === SOLID_BALLS ? 'Solids' : 'Stripes');
+            const p2BallType = player2.ballType === UNASSIGNED ? '?' : (player2.ballType === SOLID_BALLS ? 'Solids' : 'Stripes');
+            
+            // Determine balls left for each player
+            const p1BallsLeft = player1.ballType === SOLID_BALLS ? solidsLeft : (player1.ballType === STRIPE_BALLS ? stripesLeft : solidsLeft + stripesLeft);
+            const p2BallsLeft = player2.ballType === SOLID_BALLS ? solidsLeft : (player2.ballType === STRIPE_BALLS ? stripesLeft : solidsLeft + stripesLeft);
+
+
+            let p1Text = `${player1.name} (${p1BallType}): ${p1BallsLeft}`;
+            let p2Text = `${player2.name} (${p2BallType}): ${p2BallsLeft}`;
+
+            player1ScoreEl.innerHTML = currentPlayer === player1 ? `<span class="current-player">▶ ${p1Text}</span>` : p1Text;
+            player2ScoreEl.innerHTML = currentPlayer === player2 ? `<span class="current-player">▶ ${p2Text}</span>` : p2Text;
+
+            if (isFirstBreak) {
+                currentStatusEl.textContent = 'Break Shot! Player 1 to shoot.';
+            } else if (player1.ballType === UNASSIGNED) {
+                currentStatusEl.textContent = `Open Table. ${currentPlayer.name} to establish balls.`;
+            } else {
+                currentStatusEl.textContent = `${currentPlayer.name} (${currentPlayer.ballType === SOLID_BALLS ? 'Solids' : 'Stripes'}) turn.`;
+            }
+        }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawPoolTable();
+            drawScoreboard(); 
 
             pockets.forEach(p => {
                 ctx.beginPath();
@@ -433,13 +529,13 @@
                 ctx.beginPath();
                 ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
                 
-                if (ball.id !== 'cue') {
+                if (ball.id !== 0) { // Object balls (ID 1-15)
                     ctx.fillStyle = ball.color;
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
-                } else {
+                } else { // Cue ball (ID 0)
                     ctx.fillStyle = 'white';
                     ctx.fill();
                     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
@@ -480,13 +576,120 @@
             }
         }
         
+        function switchTurn() {
+            currentPlayer = currentPlayer === player1 ? player2 : player1;
+            turnSuccessful = false;
+        }
+
+        function handlePocketedBall(ball) {
+            const ballType = getBallType(ball);
+            
+            if (ballType === 'cue') {
+                showMessage('Scratch! Turn lost. Ball-in-hand.', 1500);
+                cueBallInHand = true;
+                switchTurn();
+                return false; 
+            }
+            
+            pocketedBallsInTurn.push(ballType);
+            
+            if (ballType === 'eight') {
+                const currentPlayerBallsLeft = balls.filter(b => getBallType(b) === currentPlayer.ballType && !b.isPocketed).length;
+                
+                if (currentPlayerBallsLeft > 0) {
+                    gameOverTitle.textContent = 'Game Over';
+                    gameOverMessage.textContent = `${currentPlayer.name} pocketed the 8-Ball too early. ${currentPlayer === player1 ? player2.name : player1.name} wins!`;
+                } else {
+                    gameOverTitle.textContent = 'You Win! 🎉';
+                    gameOverMessage.textContent = `${currentPlayer.name} legally pocketed the 8-Ball!`;
+                }
+                setTimeout(() => { setGameState('gameOver'); }, 500);
+                return true;
+            }
+            
+            // Handle initial assignment
+            if (player1.ballType === UNASSIGNED) {
+                if (ballType === SOLID_BALLS) {
+                    player1.ballType = SOLID_BALLS;
+                    player2.ballType = STRIPE_BALLS;
+                    player1.name = 'Player 1 (Solids)';
+                    player2.name = 'Player 2 (Stripes)';
+                } else if (ballType === STRIPE_BALLS) {
+                    player1.ballType = STRIPE_BALLS;
+                    player2.ballType = SOLID_BALLS;
+                    player1.name = 'Player 1 (Stripes)';
+                    player2.name = 'Player 2 (Solids)';
+                }
+                showMessage(`Balls assigned! ${player1.name} | ${player2.name}.`, 2000);
+                turnSuccessful = true;
+                return true;
+            }
+
+            // Check if the pocketed ball belongs to the current player
+            if (ballType === currentPlayer.ballType) {
+                turnSuccessful = true; 
+                return true;
+            } else {
+                // Opponent's ball is pocketed: stays down, turn lost (will be handled by checkTurnEndConditions)
+                turnSuccessful = false; 
+                return false;
+            }
+        }
+        
+        function checkTurnEndConditions() {
+            // Check for a scratch (already handled in handlePocketedBall, which would switch turn and set cueBallInHand)
+            if (cueBallInHand) return; 
+
+            // Check if *any* of the pocketed balls belong to the current player
+            const legalPocketOccurred = pocketedBallsInTurn.some(type => type === currentPlayer.ballType);
+
+            // If an illegal ball was pocketed (i.e., opponent's ball) but *no* legal ball was pocketed, the turn is lost.
+            const illegalPocketOccurred = pocketedBallsInTurn.some(type => type !== currentPlayer.ballType && type !== 'eight');
+
+            if (isFirstBreak) {
+                isFirstBreak = false; // Break is over, regardless of outcome
+                if (legalPocketOccurred) {
+                    // Successful break, keeps turn.
+                    showMessage(`${currentPlayer.name} established balls and keeps turn!`, 1500);
+                } else {
+                    // No legal balls pocketed or foul occurred, turn passes.
+                    showMessage(`Break shot, no balls pocketed. Turn passes to ${currentPlayer === player1 ? player2.name : player1.name}.`, 1500);
+                    switchTurn();
+                }
+            } else if (player1.ballType === UNASSIGNED) {
+                 // Open table shot
+                if (legalPocketOccurred) {
+                    // Balls were established and pocketed successfully, keep turn.
+                    showMessage(`${currentPlayer.name} keeps the turn!`, 1000);
+                } else {
+                    // No balls pocketed on open table shot or foul (handled by handlePocketedBall), turn passes.
+                    switchTurn();
+                }
+            } else if (legalPocketOccurred) {
+                showMessage(`${currentPlayer.name} keeps the turn!`, 1000);
+            } else {
+                showMessage(`No legal ball pocketed. Turn lost. Switching to ${currentPlayer === player1 ? player2.name : player1.name}.`, 1500);
+                switchTurn();
+            }
+            
+            pocketedBallsInTurn = [];
+        }
+
+
         function update() {
+            const wasMoving = ballsAreMoving;
             ballsAreMoving = balls.some(b => Math.abs(b.vx) > MIN_VELOCITY || Math.abs(b.vy) > MIN_VELOCITY);
+            
+            if (wasMoving && !ballsAreMoving) {
+                // End of turn processing
+                checkTurnEndConditions();
+            }
+            
             if(!ballsAreMoving && cueStick.active === false && gameState === 'playing') return;
 
             balls.forEach(ball => {
                 if (ball.isPocketed) return;
-                const friction = (ball.id === 'cue') ? CUE_BALL_FRICTION : OBJECT_BALL_FRICTION;
+                const friction = (ball.id === 0) ? CUE_BALL_FRICTION : OBJECT_BALL_FRICTION;
                 ball.vx *= friction;
                 ball.vy *= friction;
                 ball.spinVx *= friction;
@@ -499,6 +702,7 @@
             balls.forEach((ball, i) => {
                 if (ball.isPocketed) return;
 
+                // Wall collisions
                 if (ball.x + BALL_RADIUS > canvas.width) {
                     ball.x = canvas.width - BALL_RADIUS;
                     ball.vx *= -1;
@@ -514,29 +718,22 @@
                     ball.vy *= -1;
                 }
 
+                // Pocketing
                 pockets.forEach(p => {
                     if (distance(ball.x, ball.y, p.x, p.y) < POCKET_RADIUS * 0.9) {
                         ball.isPocketed = true;
                         ball.vx = 0; ball.vy = 0;
-                        if (ball.id === 'cue') {
-                            showMessage('Scratch!');
-                            cueBallInHand = true;
-                            setTimeout(() => {
-                                ball.isPocketed = false;
-                                ball.x = canvas.width / 2;
-                                ball.y = HEAD_STRING_Y;
-                            }, 500);
-                        } else if(ball.emoji === EIGHT_BALL_EMOJI) {
-                            const remaining = balls.filter(b => b.id !== 'cue' && b.emoji !== EIGHT_BALL_EMOJI && !b.isPocketed).length;
-                            gameOverTitle.textContent = remaining === 0 ? 'You Win! 🎉' : 'Game Over';
-                            gameOverMessage.textContent = remaining === 0 ? 'Congratulations!' : 'Better luck next time!';
-                            setTimeout(() => {
-                                setGameState('gameOver');
-                            }, 1000);
+                        handlePocketedBall(ball);
+                        // Respawn cue ball if scratched
+                        if (ball.id === 0) {
+                            ball.isPocketed = false;
+                            ball.x = canvas.width / 2;
+                            ball.y = HEAD_STRING_Y;
                         }
                     }
                 });
 
+                // Ball-to-ball collisions
                 for (let j = i + 1; j < balls.length; j++) {
                     const other = balls[j];
                     if (other.isPocketed) continue;
@@ -546,7 +743,7 @@
                     const dist = distance(ball.x, ball.y, other.x, other.y);
                     
                     if (dist < BALL_RADIUS * 2 && dist !== 0) {
-                        // FIX: Only play sound if balls are moving
+                        // Play sound only if balls are moving
                         if (ballsAreMoving) {
                             if (isFirstBreak) {
                                 playBreakSound();
@@ -611,23 +808,35 @@
 
             if (ballsAreMoving || gameState !== 'playing') return;
             const pos = getEventPos(e);
+            const cueBall = balls[0];
             
             if (cueBallInHand && e.target === canvas) {
-                balls[0].x = Math.max(BALL_RADIUS, Math.min(pos.x, canvas.width - BALL_RADIUS));
-                balls[0].y = Math.max(HEAD_STRING_Y + BALL_RADIUS, Math.min(pos.y, canvas.height - BALL_RADIUS));
+                // Place cue ball only behind the head string (HEAD_STRING_Y)
+                const targetX = Math.max(BALL_RADIUS, Math.min(pos.x, canvas.width - BALL_RADIUS));
+                const targetY = Math.max(HEAD_STRING_Y, Math.min(pos.y, canvas.height - BALL_RADIUS));
                 
-                const overlapping = balls.slice(1).some(b => !b.isPocketed && distance(balls[0].x, balls[0].y, b.x, b.y) < BALL_RADIUS * 2);
+                cueBall.x = targetX;
+                cueBall.y = targetY;
+
+                const overlapping = balls.slice(1).some(b => !b.isPocketed && distance(cueBall.x, cueBall.y, b.x, b.y) < BALL_RADIUS * 2);
                 if (!overlapping) {
                     cueBallInHand = false;
-                    showMessage("Cue ball placed.");
+                    showMessage("Cue ball placed. Now shoot.", 1500);
                 } else {
                     showMessage("Cannot place cue ball there (overlapping).", 1000);
                 }
                 draw();
                 return;
             }
+            
+            if (cueBallInHand) {
+                // Prevent shooting until cue ball is placed
+                showMessage("Place the cue ball behind the line first.", 1000);
+                return;
+            }
 
-            if (distance(pos.x, pos.y, balls[0].x, balls[0].y) < BALL_RADIUS * 2) {
+
+            if (distance(pos.x, pos.y, cueBall.x, cueBall.y) < BALL_RADIUS * 2) {
                 cueStick.active = true;
                 cueStick.startX = pos.x; cueStick.startY = pos.y;
                 cueStick.endX = pos.x; cueStick.endY = pos.y;
